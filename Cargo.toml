@@ -2,14 +2,13 @@
 name = "unicode_skeleton"
 version = "0.1.1"
 authors = ["Peter Reid <peter@peterreid.net>"]
-exclude = [
-    "data/*",
-]
+exclude = ["data/*"]
 license = "MIT/Apache-2.0"
 homepage = "https://github.com/PeterReid/unicode_skeleton"
 repository = "https://github.com/PeterReid/unicode_skeleton"
-documentation = "https://docs.rs/unicode_skeleton/*/unicode_skeleton"
-keywords = ["text", "unicode", "confusable", "skeleton"]
+documentation = "https://docs.rs/unicode_skeleton/"
+keywords = ["text", "unicode", "confusable", "skeleton", "mapping"]
+edition = "2021"
 
 description = """
 This crate detects unicode strings that look nearly
@@ -19,6 +18,4 @@ Unicode Standard Annex #39.
 """
 
 [dependencies]
-unicode-normalization = "0.1.5"
-
-
+unicode-normalization = "0.1.22"

@@ -13,7 +13,7 @@
 //! For example, "ℝ𝓊𝓈𝓉" will be transformed to "Rust".
 //! This simplified string is called the "skeleton".
 //!
-//! ```Rust
+//! ```
 //! use unicode_skeleton::UnicodeSkeleton;
 //!
 //! "ℝ𝓊𝓈𝓉".skeleton_chars().collect::<String>() // "Rust"
@@ -22,7 +22,7 @@
 //! Strings are considered "confusable" if they have the same skeleton.
 //! For example, "ℝ𝓊𝓈𝓉" and "Rust" are confusable.
 //!
-//! ```Rust
+//! ```
 //! use unicode_skeleton::confusable;
 //!
 //! confusable("ℝ𝓊𝓈𝓉", "Rust") // true
@@ -30,16 +30,9 @@
 //!
 //! The translation to skeletons is based on
 //! Unicode Security Mechanisms for UTR #39 version 10.0.0.
-extern crate unicode_normalization;
 
-use std::char;
-use std::iter::FlatMap;
-use std::slice;
-use std::str::Chars;
-use std::option;
-
-use unicode_normalization::Decompositions;
-use unicode_normalization::UnicodeNormalization;
+use std::{iter::FlatMap, option, slice, str::Chars};
+use unicode_normalization::{Decompositions, UnicodeNormalization};
 
 mod data;
 
@@ -50,9 +43,14 @@ enum PrototypeCharsIterator {
 
 impl PrototypeCharsIterator {
     pub fn new(c: char) -> PrototypeCharsIterator {
-        if let Ok(input_index) = data::INPUT_AND_OUTPUT_INDICES.binary_search_by_key(&(c as u32), |entry| entry.0) {
+        if let Ok(input_index) =
+            data::INPUT_AND_OUTPUT_INDICES.binary_search_by_key(&(c as u32), |entry| entry.0)
+        {
             let output_index_start = data::INPUT_AND_OUTPUT_INDICES[input_index].1 as usize;
-            let output_index_end = data::INPUT_AND_OUTPUT_INDICES.get(input_index+1).map(|x| x.1 as usize).unwrap_or(data::OUTPUTS.len());
+            let output_index_end = data::INPUT_AND_OUTPUT_INDICES
+                .get(input_index + 1)
+                .map(|x| x.1 as usize)
+                .unwrap_or(data::OUTPUTS.len());
             let prototype_chars = &data::OUTPUTS[output_index_start..output_index_end];
             PrototypeCharsIterator::Slice(prototype_chars.iter())
         } else {
@@ -65,20 +63,25 @@ impl Iterator for PrototypeCharsIterator {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
-        match self {
-            &mut PrototypeCharsIterator::One(ref mut x) => x.take(),
-            &mut PrototypeCharsIterator::Slice(ref mut xs) => xs.next().map(|c| *c),
+        match *self {
+            PrototypeCharsIterator::One(ref mut x) => x.take(),
+            PrototypeCharsIterator::Slice(ref mut xs) => xs.next().copied(),
         }
     }
 }
 
-type DecompositionsToPrototypeChars<I> = FlatMap<Decompositions<I>, PrototypeCharsIterator, fn(char) -> PrototypeCharsIterator>;
+type DecompositionsToPrototypeChars<I> =
+    FlatMap<Decompositions<I>, PrototypeCharsIterator, fn(char) -> PrototypeCharsIterator>;
 type DecomposeSingleChar = Decompositions<option::IntoIter<char>>;
 
 /// Test if two strings have the same "skeleton", and thus could be visually
 /// confused for each another.
 pub fn confusable<A, B, AI, BI>(a: A, b: B) -> bool
-    where A: UnicodeSkeleton<AI>, B: UnicodeSkeleton<BI>, AI: Iterator<Item=char>, BI: Iterator<Item=char>
+where
+    A: UnicodeSkeleton<AI>,
+    B: UnicodeSkeleton<BI>,
+    AI: Iterator<Item = char>,
+    BI: Iterator<Item = char>,
 {
     let mut skeleton_a = a.skeleton_chars();
     let mut skeleton_b = b.skeleton_chars();
@@ -99,11 +102,15 @@ pub fn confusable<A, B, AI, BI>(a: A, b: B) -> bool
 
 /// An iterator over the characters of the skeleton of a unicode string.
 /// This is retrieved via the `UnicodeSkeleton` trait.
-pub struct SkeletonChars<I: Iterator<Item=char>>(
-    FlatMap<DecompositionsToPrototypeChars<I>, DecomposeSingleChar, fn(char) -> Decompositions<option::IntoIter<char>>>
+pub struct SkeletonChars<I: Iterator<Item = char>>(
+    FlatMap<
+        DecompositionsToPrototypeChars<I>,
+        DecomposeSingleChar,
+        fn(char) -> Decompositions<option::IntoIter<char>>,
+    >,
 );
 
-impl<I: Iterator<Item=char>> Iterator for SkeletonChars<I> {
+impl<I: Iterator<Item = char>> Iterator for SkeletonChars<I> {
     type Item = char;
 
     fn next(&mut self) -> Option<char> {
@@ -111,18 +118,19 @@ impl<I: Iterator<Item=char>> Iterator for SkeletonChars<I> {
     }
 }
 
-impl<I: Iterator<Item=char>> SkeletonChars<I> {
+impl<I: Iterator<Item = char>> SkeletonChars<I> {
     fn new(source: I) -> SkeletonChars<I> {
         SkeletonChars(
             source
                 .nfd()
                 .flat_map(PrototypeCharsIterator::new as fn(char) -> PrototypeCharsIterator)
-                .flat_map(|x| Some(x).into_iter().nfd()) )
+                .flat_map(|x| Some(x).into_iter().nfd()),
+        )
     }
 }
 
 /// Method for retrieving a `SkeletonChars` from a `str` or other `char` iterator.
-pub trait UnicodeSkeleton<I: Iterator<Item=char>> {
+pub trait UnicodeSkeleton<I: Iterator<Item = char>> {
     /// Retrieve an iterater of the characters of the provided char sequence's skeleton
     ///
     /// # Examples
@@ -132,7 +140,7 @@ pub trait UnicodeSkeleton<I: Iterator<Item=char>> {
     fn skeleton_chars(self) -> SkeletonChars<I>;
 }
 
-impl<I: Iterator<Item=char>> UnicodeSkeleton<I> for I {
+impl<I: Iterator<Item = char>> UnicodeSkeleton<I> for I {
     fn skeleton_chars(self) -> SkeletonChars<I> {
         SkeletonChars::new(self)
     }
@@ -146,7 +154,7 @@ impl<'a> UnicodeSkeleton<Chars<'a>> for &'a str {
 
 #[cfg(test)]
 mod tests {
-    use super::{UnicodeSkeleton, confusable};
+    use super::{confusable, UnicodeSkeleton};
 
     #[test]
     fn skeleton_char_cases() {
@@ -154,7 +162,14 @@ mod tests {
         assert_eq!("𝔭𝒶ỿ𝕡𝕒ℓ".skeleton_chars().collect::<String>(), "paypal");
         assert_eq!("ℝ𝓊𝓈𝓉".skeleton_chars().collect::<String>(), "Rust");
 
-        assert_eq!(['𝒶', '𝒷', '𝒸'].iter().map(|c| *c).skeleton_chars().collect::<String>(), "abc");
+        assert_eq!(
+            ['𝒶', '𝒷', '𝒸']
+                .iter()
+                .map(|c| *c)
+                .skeleton_chars()
+                .collect::<String>(),
+            "abc"
+        );
     }
 
     #[test]
@@ -166,7 +181,10 @@ mod tests {
 
     #[test]
     fn leave_intact() {
-        assert_eq!("Plain letters".skeleton_chars().collect::<String>(), "Plain letters");
+        assert_eq!(
+            "Plain letters".skeleton_chars().collect::<String>(),
+            "Plain letters"
+        );
     }
 
     #[test]
